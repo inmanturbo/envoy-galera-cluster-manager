@@ -1,0 +1,4 @@
+.env
+**/vendor
+Envoy**.php
+!Envoy.blade.php
