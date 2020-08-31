@@ -2,3 +2,4 @@
 **/vendor
 Envoy**.php
 !Envoy.blade.php
+**/bin

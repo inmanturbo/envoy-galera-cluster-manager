@@ -36,6 +36,8 @@
         'db1','db2','db3'
     ];
 
+    $now = \Carbon\Carbon::now()->format('m_d_Y-h');
+
     $installDbCommand='echo "[mariadb]" > /etc/yum.repos.d/mariadb.repo && echo "name = MariaDB" >> /etc/yum.repos.d/mariadb.repo && echo "baseurl = http://yum.mariadb.org/10.4/rhel8-amd64" >> /etc/yum.repos.d/mariadb.repo && echo "gpgkey=https://yum.mariadb.org/RPM-GPG-KEY-MariaDB" >> /etc/yum.repos.d/mariadb.repo && echo "gpgcheck=1" >> /etc/yum.repos.d/mariadb.repo && dnf makecache && dnf install -y galera-4 && dnf install -y MariaDB-server MariaDB-client --disablerepo=AppStream'
 @endsetup
 
@@ -182,6 +184,14 @@ systemctl stop mariadb
     sed -i -e 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' /var/lib/mysql/grastate.dat
 @endtask
 
-@task('setup-ansible',['on' => ['dc']])
-echo "inman ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
+@task('backup-db',['on'=> ['db1']])
+    mysql -u root -p{{$passwd}} --execute "SET GLOBAL wsrep_desync = ON";
+    mysqldump -u root -p{{$passwd}} --flush-logs --databases digpacmaster > /backups/digpacmaster-{{$now}}.sql;
+    mysqldump -u root -p{{$passwd}} --flush-logs --all-databases > /backups/db-backup-all-{{$now}}.sql;
+    mysql -u root -p{{$passwd}} --execute "SET GLOBAL wsrep_desync = OFF";
+    curl -F file=@/backups/digpacmaster-{{$now}}.sql scripts.qwlocal;
+    curl -F file=@/backups/db-backup-all-{{$now}}.sql scripts.qwlocal;
 @endtask
+
+
+
