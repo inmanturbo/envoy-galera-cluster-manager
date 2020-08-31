@@ -25,6 +25,9 @@
     'db1'   => $db1,
     'db2'   => $db2,
     'db3'   => $db3,
+    'virthost' => 'root@virthost.qwlocal',
+    'xps' => 'root@centos-xps.turbodomain',
+    'dc' => 'dc.qwlocal',
     'libvirt' => $libvirtWorker,
     'local' => '127.0.0.1',
     ];
@@ -161,16 +164,24 @@ systemctl stop mariadb
 @endstory
 
 @task('wait-for-cluster', ['on' => ['local']])
-until ssh root@db3.qwlocal "echo up"
-do
-echo "waiting for cluster"
-done
+    until ssh root@db3.qwlocal "echo up"
+        do
+            echo "waiting for cluster"
+        done
 @endtask
 
 @task('wait-for-one', ['on' => ['local']])
-sleep 10
+    sleep 10
 @endtask
 
 @task('stop-nodes',['on'=> ['db3','db2','db1']])
-systemctl stop mariadb
+    systemctl stop mariadb
+@endtask
+
+@task('force-bootstrap',['on'=> ['db1']])
+    sed -i -e 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' /var/lib/mysql/grastate.dat
+@endtask
+
+@task('setup-ansible',['on' => ['dc']])
+echo "inman ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
 @endtask
