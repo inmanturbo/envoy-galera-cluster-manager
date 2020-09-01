@@ -27,15 +27,15 @@
         'db1'   => $db1,
         'db2'   => $db2,
         'db3'   => $db3,
-        'virthost' => 'root@virthost.qwlocal',
-        'xps' => 'root@centos-xps.turbodomain',
-        'dc' => 'dc.qwlocal',
         'libvirt' => $libvirtWorker,
         'local' => '127.0.0.1',
     ];
     
     $dbNodes = [
         'db1','db2','db3'
+    ];
+    $dbHosts = [
+        $db1,$db2,$db3
     ];
 
     $now = \Carbon\Carbon::now()->format('m_d_Y-h');
@@ -46,8 +46,8 @@
 @servers($servers)
 
 @task('install-keys',['on'=> ['local']])
-    @foreach($dbNodes as $node)
-        ssh-copy-id {{$node}}
+    @foreach($dbHosts as $host)
+        ssh-copy-id {{$host}}
     @endforeach
 @endtask
 
@@ -66,6 +66,7 @@
 
 @task('install-dbs',['on'=> $dbNodes])
     {{$installDbCommand}}
+
 @endtask
 
 @task('install-tools',['on'=> $dbNodes])
