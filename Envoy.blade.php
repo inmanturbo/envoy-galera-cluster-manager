@@ -24,14 +24,14 @@
      *  be same as their key in server array
      */
     $servers = [
-    'db1'   => $db1,
-    'db2'   => $db2,
-    'db3'   => $db3,
-    'virthost' => 'root@virthost.qwlocal',
-    'xps' => 'root@centos-xps.turbodomain',
-    'dc' => 'dc.qwlocal',
-    'libvirt' => $libvirtWorker,
-    'local' => '127.0.0.1',
+        'db1'   => $db1,
+        'db2'   => $db2,
+        'db3'   => $db3,
+        'virthost' => 'root@virthost.qwlocal',
+        'xps' => 'root@centos-xps.turbodomain',
+        'dc' => 'dc.qwlocal',
+        'libvirt' => $libvirtWorker,
+        'local' => '127.0.0.1',
     ];
     
     $dbNodes = [
