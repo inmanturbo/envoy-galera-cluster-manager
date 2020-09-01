@@ -193,5 +193,7 @@ systemctl stop mariadb
     curl -F file=@/backups/db-backup-all-{{$now}}.sql scripts.qwlocal;
 @endtask
 
-
-
+@task('install-script', ['on' => ['local']])
+    echo '#!/bin/bash'|tee ${PWD}/bin/{{$task}};
+    echo "envoy run {{$task}}"|tee -a ${PWD}/bin/{{$task}};
+@endtask
