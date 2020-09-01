@@ -1,5 +1,6 @@
 ## Ansible alternative
-for those who prefer scripting to yaml!
+For those who prefer scripting to yaml!
+PHP has come a long way
 ## Todo
 
  - [ ] Find secure way to send mysql pass inline automatically
