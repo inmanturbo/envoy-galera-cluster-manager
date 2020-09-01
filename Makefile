@@ -3,6 +3,7 @@ GCC=/bin/bash
 clean_script_path=./clean.sh
 
 run:
+	mkdir -p $(bin_path)
 	chmod u+x bin/*
 
 install: $(bin_path)/*
