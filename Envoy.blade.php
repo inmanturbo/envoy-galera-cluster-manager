@@ -15,6 +15,8 @@
     $db1=$_ENV['GALERA_NODE_ONE'];
     $db2=$_ENV['GALERA_NODE_TWO'];
     $db3=$_ENV['GALERA_NODE_THREE'];
+    $primaryDb=$_ENV['PRIMARY_DB'];
+    $simpleFileServerUrl=$_ENV['SIMPLE_FILE_SERVER_URL'];
     $libvirtWorker=$_ENV['LIBVIRT_WORKER'];
 
     /**
@@ -67,20 +69,20 @@
 @endtask
 
 @task('install-tools',['on'=> $dbNodes])
-    dnf install -y rsync policycoreutils-python-utils
+    sudo dnf install -y rsync policycoreutils-python-utils jq
 @endtask
 
 @task('update-dbs',['on'=> $dbNodes])
-    dnf update -y
+    sudo dnf update -y
 @endtask
 
 @task('enable-dbs',['on'=> $dbNodes])
-    systemctl enable mariadb
+   sudo systemctl enable mariadb
 @endtask
 
 
 @task('enable-cockpit',['on'=> $dbNodes])
-    systemctl enable --now cockpit.socket
+   sudo systemctl enable --now cockpit.socket
 @endtask
 
 @task('setup-firewall',['on'=> $dbNodes])
@@ -101,7 +103,7 @@
 @endtask
 
 @task('stop-dbs',['on'=> $dbNodes])
-systemctl stop mariadb
+    sudo systemctl stop mariadb
 @endtask
 
 
@@ -131,8 +133,12 @@ systemctl stop mariadb
 
 
 @task('start-nodes',['on'=> ['db2','db3']])
-    systemctl start mariadb
+    sudo systemctl start mariadb
     sleep 5 && mysql -u root -p{{$passwd}} -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+@endtask
+
+@task('ping-nodes',['on'=> ['db1','db2','db3']])
+    mysql -u root -p{{$passwd}} -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
 @endtask
 
 
@@ -143,17 +149,17 @@ systemctl stop mariadb
 @endstory
 
 @task('disable-dbs',['on'=> $dbNodes])
-    systemctl disable mariadb
+    sudo systemctl disable mariadb
 @endtask
 
 @task('shutdown-dbs',['on'=> ['libvirt']])
     @foreach($dbNodes as $node)
-        virsh destroy {{$node}}
+        virsh shutdown {{$node}}
     @endforeach
 @endtask
 
 @task('stop-nodes',['on'=> ['db3','db2','db1']])
-    systemctl stop mariadb
+    sudo systemctl stop mariadb
 @endtask
 
 @story('up-cluster')
@@ -166,7 +172,7 @@ systemctl stop mariadb
 @endstory
 
 @task('wait-for-cluster', ['on' => ['local']])
-    until ssh root@db3.qwlocal "echo up"
+    until ssh {{$db3}} "echo up"
         do
             echo "waiting for cluster"
         done
@@ -177,23 +183,33 @@ systemctl stop mariadb
 @endtask
 
 @task('stop-nodes',['on'=> ['db3','db2','db1']])
-    systemctl stop mariadb
+    sudo systemctl stop mariadb
 @endtask
 
 @task('force-bootstrap',['on'=> ['db1']])
-    sed -i -e 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' /var/lib/mysql/grastate.dat
+    sudo sed -i -e 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' /var/lib/mysql/grastate.dat
 @endtask
 
 @task('backup-db',['on'=> ['db1']])
     mysql -u root -p{{$passwd}} --execute "SET GLOBAL wsrep_desync = ON";
-    mysqldump -u root -p{{$passwd}} --flush-logs --databases digpacmaster > /backups/digpacmaster-{{$now}}.sql;
-    mysqldump -u root -p{{$passwd}} --flush-logs --all-databases > /backups/db-backup-all-{{$now}}.sql;
+    sudo mysqldump -u root -p{{$passwd}} --flush-logs --databases {{$primaryDb}} |sudo tee /backups/{{$primaryDb}}-{{$now}}.sql > /dev/null;
+    sudo mysqldump -u root -p{{$passwd}} --flush-logs --all-databases |sudo tee /backups/db-backup-all-{{$now}}.sql > /dev/null;
     mysql -u root -p{{$passwd}} --execute "SET GLOBAL wsrep_desync = OFF";
-    curl -F file=@/backups/digpacmaster-{{$now}}.sql scripts.qwlocal;
-    curl -F file=@/backups/db-backup-all-{{$now}}.sql scripts.qwlocal;
+    curl -sF file=@/backups/{{$primaryDb}}-{{$now}}.sql {{$simpleFileServerUrl}}  > ~/.backup-report-{{$primaryDb}}-{{$now}}.log;
+    curl -sF file=@/backups/db-backup-all-{{$now}}.sql {{$simpleFileServerUrl}} > ~/.backup-report-all-{{$now}}.log;
+    if [[ $(jq '.success' ~/.backup-report-{{$primaryDb}}-{{$now}}.log) = "true" ]]; then sudo rm /backups/{{$primaryDb}}-{{$now}}.sql;fi;
+    if [[ $(jq '.success' ~/.backup-report-all-{{$now}}.log) = "true" ]]; then sudo rm /backups/db-backup-all-{{$now}}.sql;fi;
 @endtask
 
 @task('install-script', ['on' => ['local']])
     echo '#!/bin/bash'|tee ${PWD}/bin/{{$task}};
-    echo "envoy run {{$task}}"|tee -a ${PWD}/bin/{{$task}};
+    echo "target_dir=${PWD}"|tee -a ${PWD}/bin/{{$task}};
+    echo 'previous_dir=${PWD}'|tee -a ${PWD}/bin/{{$task}};
+    echo 'cd $target_dir'|tee -a ${PWD}/bin/{{$task}};
+    echo "${PWD}/vendor/bin/envoy run {{$task}}"|tee -a ${PWD}/bin/{{$task}};
+    echo 'cd $previous_dir'|tee -a ${PWD}/bin/{{$task}};
+@endtask
+
+@task('list-nodes',['on'=> ['libvirt']])
+        virsh list --all|grep db
 @endtask
