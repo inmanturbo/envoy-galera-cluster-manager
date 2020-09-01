@@ -9,7 +9,7 @@
     $dotenv->load();
 
     /**
-     *  Password for root user on all galera nodes
+     *  Password for "ansible" user on all galera nodes
      */
     $passwd=$_ENV['GALERA_PASS'];
     $db1=$_ENV['GALERA_NODE_ONE'];
