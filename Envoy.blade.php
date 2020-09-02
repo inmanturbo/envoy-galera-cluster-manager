@@ -68,7 +68,7 @@
     * server on network with curl support. 
     * e.g. fileserver.local
     */
-    $simpleFileServerUrl=$_ENV['SIMPLE_FILE_SERVER_URL'];
+    $simpleFileServerUri=$_ENV['SIMPLE_FILE_SERVER_URI'];
 
     /**
     * ssh login for cluster manager
@@ -410,12 +410,12 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 
 {{-- EXAMPLE BACKUP TASK --}}
 @task('backup-db',['on'=> ['db1']])
-    mysql -u root -p{{$mysqlRootPassword}} --execute "SET GLOBAL wsrep_desync = ON";
-    sudo mysqldump -u root -p{{$mysqlRootPassword}} --flush-logs --databases {{$primaryDb}} |sudo tee /backups/{{$primaryDb}}-{{$now}}.sql > /dev/null;
-    sudo mysqldump -u root -p{{$mysqlRootPassword}} --flush-logs --all-databases |sudo tee /backups/db-backup-all-{{$now}}.sql > /dev/null;
-    mysql -u root -p{{$mysqlRootPassword}} --execute "SET GLOBAL wsrep_desync = OFF";
-    curl -sF file=@/backups/{{$primaryDb}}-{{$now}}.sql {{$simpleFileServerUrl}}  > ~/.backup-report-{{$primaryDb}}-{{$now}}.log;
-    curl -sF file=@/backups/db-backup-all-{{$now}}.sql {{$simpleFileServerUrl}} > ~/.backup-report-all-{{$now}}.log;
+    mysql -u root -p{{$mysqlRootPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
+    mysqldump -u root -p{{$mysqlRootPasswd}} --flush-logs --databases {{$primaryDb}} |sudo tee /backups/{{$primaryDb}}-{{$now}}.sql > /dev/null;
+    mysqldump -u root -p{{$mysqlRootPasswd}} --flush-logs --all-databases |sudo tee /backups/db-backup-all-{{$now}}.sql > /dev/null;
+    mysql -u root -p{{$mysqlRootPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
+    curl -sF file=@/backups/{{$primaryDb}}-{{$now}}.sql {{$simpleFileServerUri}}  > ~/.backup-report-{{$primaryDb}}-{{$now}}.log;
+    curl -sF file=@/backups/db-backup-all-{{$now}}.sql {{$simpleFileServerUri}} > ~/.backup-report-all-{{$now}}.log;
     if [[ $(jq '.success' ~/.backup-report-{{$primaryDb}}-{{$now}}.log) = "true" ]]; then sudo rm /backups/{{$primaryDb}}-{{$now}}.sql;fi;
     if [[ $(jq '.success' ~/.backup-report-all-{{$now}}.log) = "true" ]]; then sudo rm /backups/db-backup-all-{{$now}}.sql;fi;
 @endtask
