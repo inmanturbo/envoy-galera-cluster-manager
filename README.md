@@ -12,6 +12,11 @@ PHP has come a long way
 6. 15 min coffee break!
 7. Test cluster
 
+## Alternatives
+- Use ansible
+- Follow (tutorial)[https://www.digitalocean.com/community/tutorials/how-to-configure-a-galera-cluster-with-mariadb-on-centos-7-servers]
+
+
 ## Todo
 
  - [x] Find secure way to send mysql pass inline automatically
