@@ -2,10 +2,27 @@
 For those who prefer scripting to yaml!
 
 PHP has come a long way
+
+## Getting started
+1. clone repo
+2. `composer install`
+3. `cp .env.example .env`
+4. set environment variables
+5. `envoy run setup-cluster`
+6. first task requires ~ 30 seconds interaction
+7. 15 min coffee break!
+8. Test cluster
+
+## Alternatives
+- Use ansible
+- Follow [tutorial](https://www.digitalocean.com/community/tutorials/how-to-configure-a-galera-cluster-with-mariadb-on-centos-7-servers)
+
+
 ## Todo
 
- - [ ] Find secure way to send mysql pass inline automatically
- - [ ] Put provisioning tasks into a single automated story
+ - [x] Find secure way to send mysql pass inline automatically
+ - [x] Put provisioning tasks into a single automated story
+ - [ ] Refactor galera config templates into a single template, then loop through them
  - [ ] Doc block all taskes and stories
 
 
