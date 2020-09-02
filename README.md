@@ -6,6 +6,7 @@ PHP has come a long way
 
  - [x] Find secure way to send mysql pass inline automatically
  - [x] Put provisioning tasks into a single automated story
+ - [ ] Refactor galera config templates into a single template, then loop through them
  - [ ] Doc block all taskes and stories
 
 
