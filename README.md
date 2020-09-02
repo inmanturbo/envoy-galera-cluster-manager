@@ -5,7 +5,7 @@ PHP has come a long way
 
 ## Getting started
 1. clone repo
-2. composer install
+2. `composer install`
 3. `cp .env.example .env`
 4. set environment variables
 5. `envoy run setup-cluster`
