@@ -6,7 +6,7 @@ PHP has come a long way
 ## Getting started
 1. clone repo
 2. composer install
-3. set environment varibales
+3. set environment variables
 4. envoy run setup-cluster
 5. first task requires ~ 2min interaction
 6. 15 min coffee break!
