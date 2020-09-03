@@ -438,10 +438,11 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 {{-- 
     backs up data to git repo, will version control your data. Make sure your repository is private!!
     Also, you must have enough space in /tmp directory to stage data prior to push.
+    Todo: add json and csv formatted dumps as well
     OPTIONS:
         --checkvalues=[false] true returns optional values and exits
         --repo=[REPOSITORY_URI] default: $dataRepository
-        --no_galera=[true] default: true to run on standalone database server
+        --nogalera=[false] true to run on standalone database server
         --hostname=[HOSTNAME] default: $galeraHostOne 
         --password=[PASSWORD] default: $mysqlAdminPasswd
         --user=[USERNAME] default: $mysqlAdminUser
