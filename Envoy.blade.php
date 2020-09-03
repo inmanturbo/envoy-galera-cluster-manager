@@ -437,9 +437,15 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @task('backup-db',['on'=> ['local']])
     git clone {{$dataRepository}} /tmp/DATA_REPOSITORY_{{$now}}
     mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/{mariadb,json,csv}
-    mysql -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
-for db in $(mysql -NBA -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
+    @if(!isset($no_galera))
+        mysql -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
+    @endif
+for db in $(mysql -NBA -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
+    @if(!isset($no_galera))
+        mysql -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
+    @endif
 cd /tmp/DATA_REPOSITORY_{{$now}} && git add --all && git commit -m 'auto_committed on {{$now}}' && git push -u origin master;
+    rm -rf /tmp/DATA_REPOSITORY*
 @endtask
 
 @task('install-task', ['on' => ['local']])
