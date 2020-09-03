@@ -15,6 +15,24 @@
     $adminPasswd=$_ENV['ADMIN_PASSWORD'];
 
     /**
+     *  Password for remote mysqladmin user 
+     *  
+     */
+    $mysqlAdminPasswd=$_ENV['MYSQL_ADMIN_PASSWORD'];
+
+    /**
+     *  Username for remote mysqladmin user 
+     *  
+     */
+    $mysqlAdminUser=$_ENV['MYSQL_ADMIN_USERNAME'];
+
+    /**
+     *  Password for "admin" user on all galera nodes
+     *  current scripts require passwordless sudo
+     */
+    $mysqlAdminPasswd=$_ENV['MYSQL_ADMIN_PASSWORD'];
+
+    /**
      *  Password for root mysql account on all galera nodes
      */
     $mysqlRootPasswd=$_ENV['MYSQL_ROOT_PASSWORD'];
@@ -71,6 +89,13 @@
     $simpleFileServerUri=$_ENV['SIMPLE_FILE_SERVER_URI'];
 
     /**
+    * Optional Data repository for trtacking database changes
+    * server on network with curl support. 
+    * e.g. fileserver.local
+    */
+    $dataRepository=$_ENV['DATA_REPOSITORY'];
+
+    /**
     * ssh login for cluster manager
     * or single node hypervisor
     * requires libvirt
@@ -111,7 +136,7 @@
     /**
     * For timestamp versioning mysql dumps
     */
-    $now = \Carbon\Carbon::now()->format('m_d_Y-h');
+    $now = \Carbon\Carbon::now()->format('m_d_Y-h-i-s');
 
     $installDbCommand='echo "[mariadb]" |sudo tee /etc/yum.repos.d/mariadb.repo > /dev/null '.
                        '&& echo "name = MariaDB"|sudo tee -a /etc/yum.repos.d/mariadb.repo >/dev/null '. 
@@ -409,15 +434,12 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 {{-- EXAMPLE BACKUP TASK --}}
-@task('backup-db',['on'=> ['db1']])
-    mysql -u root -p{{$mysqlRootPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
-    mysqldump -u root -p{{$mysqlRootPasswd}} --flush-logs --databases {{$primaryDb}} |sudo tee /backups/{{$primaryDb}}-{{$now}}.sql > /dev/null;
-    mysqldump -u root -p{{$mysqlRootPasswd}} --flush-logs --all-databases |sudo tee /backups/db-backup-all-{{$now}}.sql > /dev/null;
-    mysql -u root -p{{$mysqlRootPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
-    curl -sF file=@/backups/{{$primaryDb}}-{{$now}}.sql {{$simpleFileServerUri}}  > ~/.backup-report-{{$primaryDb}}-{{$now}}.log;
-    curl -sF file=@/backups/db-backup-all-{{$now}}.sql {{$simpleFileServerUri}} > ~/.backup-report-all-{{$now}}.log;
-    if [[ $(jq '.success' ~/.backup-report-{{$primaryDb}}-{{$now}}.log) = "true" ]]; then sudo rm /backups/{{$primaryDb}}-{{$now}}.sql;fi;
-    if [[ $(jq '.success' ~/.backup-report-all-{{$now}}.log) = "true" ]]; then sudo rm /backups/db-backup-all-{{$now}}.sql;fi;
+@task('backup-db',['on'=> ['local']])
+    git clone {{$dataRepository}} /tmp/DATA_REPOSITORY_{{$now}}
+    mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/{mariadb,json,csv}
+    mysql -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
+for db in $(mysql -NBA -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$galeraHostOne}} -u {{$mysqlAdminUser}} -p{{$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
+cd /tmp/DATA_REPOSITORY_{{$now}} && git add --all && git commit -m 'auto_committed on {{$now}}' && git push -u origin master;
 @endtask
 
 @task('install-task', ['on' => ['local']])
