@@ -223,6 +223,7 @@ $galeraHostConfigArray=[
     'db3' => ['template' => $nodeThreeTemplate, 'hostname' => $galeraHostThree],
 ];
 
+$nogalera = $nogalera ?? "false";
 @endsetup
 
 @servers($servers)
@@ -434,14 +435,35 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 {{-- EXAMPLE BACKUP TASK --}}
+{{-- 
+    backs up data to git repo, will version control your data. Make sure your repository is private!!
+    Also, you must have enough space in /tmp directory to stage data prior to push.
+    OPTIONS:
+        --checkvalues=[false] true returns optional values and exits
+        --repo=[REPOSITORY_URI] default: $dataRepository
+        --no_galera=[true] default: true to run on standalone database server
+        --hostname=[HOSTNAME] default: $galeraHostOne 
+        --password=[PASSWORD] default: $mysqlAdminPasswd
+        --user=[USERNAME] default: $mysqlAdminUser
+
+--}}
 @task('backup-db',['on'=> ['local']])
-    git clone {{$dataRepository}} /tmp/DATA_REPOSITORY_{{$now}}
-    mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/{mariadb,json,csv}
-    @if(!isset($no_galera))
-        mysql -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
+    @if($checkvalues)
+        echo {{$nogalera}}
+        echo {{$repo??$dataRepository}}
+        echo {{$user??$mysqlAdminUser}}
+        echo {{$hostname??$galeraHostOne}}
+        echo {{$password??$mysqlAdminPasswd}}
+        exit 1;
     @endif
-for db in $(mysql -NBA -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
-    @if(!isset($no_galera))
+
+    git clone {{$repo??$dataRepository}} /tmp/DATA_REPOSITORY_{{$now}}
+    mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/{mariadb,json,csv}
+    @if($nogalera == "false")
+        mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = ON";
+    @endif
+for db in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
+    @if($nogalera == "false")
         mysql -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
     @endif
 cd /tmp/DATA_REPOSITORY_{{$now}} && git add --all && git commit -m 'auto_committed on {{$now}}' && git push -u origin master;
