@@ -593,7 +593,7 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('log-task', ['on' =>['local']])
-    echo "{{$logentry??'task'}} ran on {{$now}} "|tee a- ~/.envoy-task-log 
+    echo "{{$logentry??'task'}} ran on {{$now}} "|tee -a ~/.envoy-task-log 
 @endtask
 
 @task('install-task', ['on' => ['local']])
