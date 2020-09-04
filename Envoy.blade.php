@@ -574,7 +574,7 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('load-database-from-git-repo', ['on' => ['local']])
-    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/mariadb/{{$db??$primaryDb}}.sql;
+    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/mariadb/{{$newdb??$db??$primaryDb}}.sql;
 @endtask
 
 @task('load-table-from-git-repo', ['on' => ['local']])
