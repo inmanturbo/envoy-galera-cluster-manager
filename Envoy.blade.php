@@ -136,7 +136,7 @@
     /**
     * For timestamp versioning mysql dumps
     */
-    $now = \Carbon\Carbon::now()->format('m_d_Y-h-i-s');
+    $now = \Carbon\Carbon::now('America/New_York')->format('m_d_Y-h-i-s');
 
     $installDbCommand='echo "[mariadb]" |sudo tee /etc/yum.repos.d/mariadb.repo > /dev/null '.
                        '&& echo "name = MariaDB"|sudo tee -a /etc/yum.repos.d/mariadb.repo >/dev/null '. 
@@ -250,6 +250,7 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     create-enable-selinux-policies
     activate-selinux-policies
     secure-nodes
+    log-task
 
 @endstory
 
@@ -261,6 +262,7 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     wait-for-one
     join-nodes
     enable-mariadbs
+    log-task
 
 @endstory
 
@@ -269,6 +271,7 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     stop-mariadbs
     disable-mariadbs
     shutdown-nodes
+    log-task
 
 @endstory
 
@@ -277,6 +280,7 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     start1
     wait-for-one
     join-nodes
+    log-task
 
 @endstory
 
@@ -306,6 +310,7 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     resync
     push-new-data
     cleanup-staged-data
+    log-task
 
 @endstory
 
@@ -323,6 +328,23 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
     force-resync-nodes
     force-resync-nodes
     ping-nodes
+    log-task
+
+@endstory
+
+@story('git-table-import')
+
+    check-for-table
+    clone-data-repo
+    desync
+    load-table-from-git-repo
+    resync
+    cleanup-staged-data
+    force-resync-nodes
+    force-resync-nodes
+    force-resync-nodes
+    ping-nodes
+    log-task
 
 @endstory
 
@@ -500,6 +522,15 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 
 @task('clone-data-repo', ['on' => ['local']])
     git clone {{$repo??$dataRepository}} {{$datadir}}
+    @if($checkout=="true")
+        @if(!isset($hash))
+            echo checkout option requires a hash. Please specifiy a commit hash.
+            echo "cleaning up ..." && rm -rf {{$datadir}}
+            exit 1;
+        @endif
+        cd {{$datadir}}
+        git checkout {{$hash}}
+    @endif
 @endtask
 
 @task('prepare-data-repo-dirs', ['on' => ['local']])
@@ -544,6 +575,25 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 
 @task('load-database-from-git-repo', ['on' => ['local']])
     mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/mariadb/{{$db??$primaryDb}}.sql;
+@endtask
+
+@task('load-table-from-git-repo', ['on' => ['local']])
+    @if(!isset($table))
+        echo "please enter a table"
+        exit 1;
+    @endif
+    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/{{$table}}/mariadb/{{$db??$primaryDb}}.sql;
+@endtask
+
+@task('check-for-table', ['on' => ['local']])
+    @if(!isset($table))
+        echo "please enter a table"
+        exit 1;
+    @endif
+@endtask
+
+@task('log-task', ['on' =>['local']])
+    echo "{{$task??'task'}} ran on {{$now}} "|tee a- ~/.envoy-task-log 
 @endtask
 
 @task('install-task', ['on' => ['local']])
