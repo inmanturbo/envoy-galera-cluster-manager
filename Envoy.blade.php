@@ -582,7 +582,7 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
         echo "please enter a table"
         exit 1;
     @endif
-    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/{{$table}}/mariadb/{{$db??$primaryDb}}.sql;
+    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/{{$newdb??$db??$primaryDb}}/mariadb/{{$table}}.sql;
 @endtask
 
 @task('check-for-table', ['on' => ['local']])
