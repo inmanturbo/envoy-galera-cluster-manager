@@ -224,6 +224,7 @@ $galeraHostConfigArray=[
 ];
 
 $nogalera = $nogalera ?? "false";
+$datadir = '/tmp/DATA_REPOSITORY_'.$now; 
 @endsetup
 
 @servers($servers)
@@ -305,6 +306,23 @@ $nogalera = $nogalera ?? "false";
     resync
     push-new-data
     cleanup-staged-data
+
+@endstory
+
+{{-- 
+    For some reason nodes must be resynced three times with big dump imports?    
+--}}
+@story('git-data-import')
+
+    clone-data-repo
+    desync
+    load-database-from-git-repo
+    resync
+    cleanup-staged-data
+    force-resync-nodes
+    force-resync-nodes
+    force-resync-nodes
+    ping-nodes
 
 @endstory
 
@@ -457,6 +475,9 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 
 @task('ping-nodes',['on'=> ['db1','db2','db3']])
     mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_local_state_comment'"
+    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_ready'"
+    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_connected'"
 @endtask
 
 @task('force-bootstrap',['on'=> ['db1']])
@@ -478,11 +499,11 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('clone-data-repo', ['on' => ['local']])
-    git clone {{$repo??$dataRepository}} /tmp/DATA_REPOSITORY_{{$now}}
+    git clone {{$repo??$dataRepository}} {{$datadir}}
 @endtask
 
 @task('prepare-data-repo-dirs', ['on' => ['local']])
-    mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/{mariadb,json,csv}
+    mkdir -p {{$datadir}}/{mariadb,json,csv}
 @endtask
 
 @task('desync', ['on' => ['local']])
@@ -494,26 +515,35 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('data-dump-loop', ['on' => ['local']])
-    for db in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p /tmp/DATA_REPOSITORY_{{$now}}/${db}/{mariadb,json,csv}; mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee /tmp/DATA_REPOSITORY_{{$now}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
+    for db in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SHOW DATABASES";); do mkdir -p {{$datadir}}/${db}/{mariadb,json,csv}; mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} |sudo tee {{$datadir}}/mariadb/${db}.sql > /dev/null; for table in $(mysql -NBA -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} ${db} --execute "SHOW TABLES";); do mysqldump -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --flush-logs --single-transaction ${db} ${table} |sudo tee {{$datadir}}/${db}/mariadb/${table}.sql > /dev/null; done; done;
 @endtask
 
 @task('resync', ['on' => ['local']])
     @if($nogalera == "false")
-        mysql -h {{$host??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
+        mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} --execute "SET GLOBAL wsrep_desync = OFF";
     @else
         echo "ignoring galera options"
     @endif
 @endtask
 
 @task('push-new-data', ['on' => ['local']])
-    cd /tmp/DATA_REPOSITORY_{{$now}} 
+    cd {{$datadir}} 
     git add --all 
     git commit -m 'auto_committed on {{$now}}' 
     git push -u origin master;
 @endtask
 
 @task('cleanup-staged-data', ['on' => ['local']])
-    rm -rf /tmp/DATA_REPOSITORY*
+    rm -rf {{$datadir}}
+@endtask
+
+@task('force-resync-nodes', ['on' => ['db2', 'db3']])
+    sudo rm -f /var/lib/mysql/grastate.dat
+    sudo systemctl restart mariadb
+@endtask
+
+@task('load-database-from-git-repo', ['on' => ['local']])
+    mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/mariadb/{{$db??$primaryDb}}.sql;
 @endtask
 
 @task('install-task', ['on' => ['local']])
