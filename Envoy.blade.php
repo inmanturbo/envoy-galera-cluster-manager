@@ -316,18 +316,19 @@ $datadir = '/tmp/DATA_REPOSITORY_'.$now;
 
 {{-- 
     For some reason nodes must be resynced three times with big dump imports?    
+        mysql -h {{$hostname??$galeraHostOne}} -u {{$user??$mysqlAdminUser}} -p{{$password??$mysqlAdminPasswd}} {{$db??$primaryDb}} < {{$datadir}}/mariadb/{{$newdb??$db??$primaryDb}}.sql;
 --}}
 @story('git-data-import')
 
     clone-data-repo
-    desync
+    {{-- desync --}}
     load-database-from-git-repo
-    resync
+    {{-- resync --}}
     cleanup-staged-data
+    {{-- force-resync-nodes
     force-resync-nodes
     force-resync-nodes
-    force-resync-nodes
-    ping-nodes
+    ping-nodes --}}
     log-task
 
 @endstory
@@ -364,6 +365,18 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 
 @task('install-mariadb-galera',['on'=> $galeraNodes])
     {{$installDbCommand}}
+@endtask
+
+@task('install-mariadb-metal',['on'=> 'libvirt'])
+    echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} ALL=(ALL) NOPASSWD: ALL'|sudo tee -a /etc/sudoers
+    sudo dnf update -y
+    sudo dnf install -y rsync policycoreutils-python-utils jq
+    {{$installDbCommand}}
+    sudo systemctl enable --now mariadb
+    sudo mysqladmin --user=root password "{{$mysqlRootPasswd}}"
+    mysql -u root -p{{$mysqlRootPasswd}} -e "create user '{{$mysqlAdminUser}}'@'%' identified by '{{$mysqlAdminPasswd}}'; grant all privileges on *.* to '{{$mysqlAdminUser}}'@'%' identified by '{{$mysqlAdminPasswd}}'; flush privileges;"
+    sudo firewall-cmd --permanent --add-port=3306/tcp
+    sudo firewall-cmd --reload
 @endtask
 
 @task('install-tools',['on'=> $galeraNodes])
@@ -496,10 +509,14 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('ping-nodes',['on'=> ['db1','db2','db3']])
-    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
-    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_local_state_comment'"
-    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_ready'"
-    mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_connected'"
+    @if($nogalera == "false")
+        mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+        mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_local_state_comment'"
+        mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_ready'"
+        mysql -u root -p{{$mysqlRootPasswd}} -e "SHOW STATUS LIKE 'wsrep_connected'"
+        @else
+        echo "ignoring galera options"
+    @endif
 @endtask
 
 @task('force-bootstrap',['on'=> ['db1']])
@@ -569,8 +586,12 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('force-resync-nodes', ['on' => ['db2', 'db3']])
-    sudo rm -f /var/lib/mysql/grastate.dat
-    sudo systemctl restart mariadb
+    @if($nogalera == "false")
+        sudo rm -f /var/lib/mysql/grastate.dat
+        sudo systemctl restart mariadb
+        @else
+        echo "ignoring galera options"
+    @endif
 @endtask
 
 @task('load-database-from-git-repo', ['on' => ['local']])
@@ -593,7 +614,7 @@ echo "{{$adminPasswd}}"|sudo -S echo "hello sudo" && echo '{{$adminUsername}} AL
 @endtask
 
 @task('log-task', ['on' =>['local']])
-    echo "{{$logentry??'task'}} ran on {{$now}} "|tee -a ~/.envoy-task-log 
+    echo "{{$logentry??'task'}} ran on {{$now}} "|tee -a ${PWD}/.envoy-task-log
 @endtask
 
 @task('install-task', ['on' => ['local']])
