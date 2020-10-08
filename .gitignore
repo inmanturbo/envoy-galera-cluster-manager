@@ -3,3 +3,4 @@
 Envoy**.php
 !Envoy.blade.php
 **/bin
+.envoy-task-log
